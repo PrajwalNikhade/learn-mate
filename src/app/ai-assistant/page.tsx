@@ -32,7 +32,7 @@ export default function AiAssistantPage() {
     setIsLoading(true);
 
     try {
-      const response = await fetch('/api', {
+      const response = await fetch('/api/chat', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -40,16 +40,20 @@ export default function AiAssistantPage() {
         body: JSON.stringify({ message: newMessages }),
       });
 
+      const data = await response.json();
+
       if (!response.ok) {
-        throw new Error('Network response was not ok');
+        throw new Error(data.error || 'Failed to get AI response');
       }
 
-      const data = await response.json();
       const modelMessage: Message = { role: 'model', content: data.reply };
       setMessages([...newMessages, modelMessage]);
     } catch (error) {
       console.error('Failed to fetch AI response:', error);
-      const errorMessage: Message = { role: 'model', content: 'Sorry, I am having trouble connecting. Please try again later.' };
+      const errorMessage: Message = { 
+        role: 'model', 
+        content: error instanceof Error ? error.message : 'Sorry, I am having trouble connecting. Please try again later.' 
+      };
       setMessages([...newMessages, errorMessage]);
     } finally {
       setIsLoading(false);
@@ -67,18 +71,24 @@ export default function AiAssistantPage() {
           {messages.map((msg, index) => (
             <div key={index} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
               <div className={`p-3 rounded-lg max-w-lg ${msg.role === 'user' ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-300'}`}>
-                <p>{msg.content}</p>
+                <p className="whitespace-pre-wrap">{msg.content}</p>
               </div>
             </div>
           ))}
-           {isLoading && (
+          {isLoading && (
             <div className="flex justify-start">
-                 <div className="p-3 rounded-lg max-w-lg bg-sky-200 text-white">
-   
-                    <p>...</p>
-                 </div>
+              <div className="p-3 rounded-lg max-w-lg bg-gray-600 text-gray-300">
+                <div className="flex items-center space-x-2">
+                  <div className="animate-pulse">Thinking...</div>
+                  <div className="flex space-x-1">
+                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
+                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></div>
+                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
+                  </div>
+                </div>
+              </div>
             </div>
-            )}
+          )}
           <div ref={messagesEndRef} />
         </div>
       </main>
