@@ -1,10 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { GoogleGenerativeAI } from '@google/generative-ai';
-// Dynamically import GoogleGenerativeAI to avoid potential SSR issues
-async function getGeminiAI() {
-    const { GoogleGenerativeAI } = await import('@google/generative-ai');
-    return GoogleGenerativeAI;
-}
+import OpenAI from 'openai';
+
 
 export async function POST(req: NextRequest) {
     console.log('Chat API route hit!');
@@ -25,11 +21,11 @@ export async function POST(req: NextRequest) {
         }
 
         // Check for API key
-        const apiKey = process.env.GEMINI_API_KEY;
+        const apiKey = process.env.OPENROUTER_API_KEY;
         if (!apiKey) {
-            console.error('GEMINI_API_KEY not found in environment variables');
+            console.error('OPENROUTER_API_KEY not found in environment variables');
             return NextResponse.json(
-                { error: "Gemini API key not configured. Please set GEMINI_API_KEY in your .env.local file." }, 
+                { error: "OpenRouter API key not configured. Please set OPENROUTER_API_KEY in your .env.local file." }, 
                 { status: 500 }
             );
         }
@@ -38,63 +34,55 @@ export async function POST(req: NextRequest) {
 
         try {
             // Initialize Gemini AI
-            const genAI = new GoogleGenerativeAI(apiKey);
-            const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro-latest" });
+            const openai = new OpenAI({
+                apiKey: apiKey,
+                baseURL: "https://openrouter.ai/api/v1"
+            });
+            const model = 'openai/gpt-4o';
 
             // Format messages for Gemini
             const formattedMessages = message.map((m: any) => ({
-                role: m.role === 'model' ? 'model' : 'user',
-                parts: [{ text: String(m.content) }]
+                role: m.role === 'model' ? 'assistant' : 'user',
+                content: m.content
             }));
 
-            console.log('Sending to Gemini:', formattedMessages);
+            console.log('Sending to OpenRouter:', formattedMessages);
 
-            // Generate content
-            const result = await model.generateContent({
-                contents: formattedMessages
+            const completion = await openai.chat.completions.create({
+                model: model,
+                messages: formattedMessages,
+                max_tokens: 2000
             });
-
-            const response = result.response;
-            const text = response.text();
+            const text = completion.choices[0].message.content;
 
             if (!text) {
-                throw new Error('Empty response from Gemini API');
+                throw new Error('Empty response from OpenRouter API');
             }
 
-            console.log('Gemini response:', text.substring(0, 100) + '...');
+            console.log('OpenRouter API response received');
 
             return NextResponse.json({ reply: text });
 
-        } catch (geminiError: any) {
-            console.error('Gemini API Error:', geminiError);
+        } catch (openRouterError: any) {
+            console.error('OpenRouter API Error:', openRouterError);
             
-            // Handle specific Gemini errors
-            if (geminiError.message?.includes('API key not valid')) {
+            // Handle specific OpenRouter errors
+            if (openRouterError.message?.includes('API key not valid')) {
                 return NextResponse.json(
-                    { error: "Invalid Gemini API key. Please check your API key." }, 
+                    { error: "Invalid API key. Please check your OpenRouter API key." }, 
                     { status: 401 }
                 );
             }
             
-            if (geminiError.message?.includes('quota')) {
-                return NextResponse.json(
-                    { error: "API quota exceeded. Please try again later." }, 
-                    { status: 429 }
-                );
-            }
 
-            if (geminiError.message?.includes('safety') || geminiError.message?.includes('SAFETY')) {
-                return NextResponse.json(
-                    { error: "Content was blocked by safety filters. Please rephrase your question." }, 
-                    { status: 400 }
-                );
-            }
+
+
 
             // For development, return more detailed error info
             return NextResponse.json(
                 { 
-                    error: "Gemini API Error: " + geminiError.message,
-                    details: process.env.NODE_ENV === 'development' ? geminiError.stack : undefined
+                    error: "OpenRouter API Error: " + openRouterError.message,
+                    details: process.env.NODE_ENV === 'development' ? openRouterError.stack : undefined
                 }, 
                 { status: 500 }
             );
@@ -116,8 +104,8 @@ export async function POST(req: NextRequest) {
 export async function GET() {
     return NextResponse.json({ 
         message: "Chat API route is working!",
-        hasApiKey: !!process.env.GEMINI_API_KEY,
-        keyLength: process.env.GEMINI_API_KEY?.length || 0,
+        hasApiKey: !!process.env.OPENROUTER_API_KEY,
+        keyLength: process.env.OPENROUTER_API_KEY?.length || 0,
         timestamp: new Date().toISOString()
     });
 }
